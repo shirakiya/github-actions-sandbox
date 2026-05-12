@@ -1,0 +1,62 @@
+name: Verify triggering actor values
+
+# 検証シナリオ:
+# 1. pull_request: 3つの値すべてが揃う基本ケース
+# 2. workflow_dispatch: PR由来の値が空になるケース
+# 3. ワークフローの再実行: actor と triggering_actor が異なるケースを再現できる
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify-actors:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print actor context values
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          PR_USER_LOGIN: ${{ github.event.pull_request.user.login }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          echo "============================================"
+          echo " Actor Context Values"
+          echo "============================================"
+          printf "%-45s %s\n" "github.actor"                        ": ${ACTOR}"
+          printf "%-45s %s\n" "github.triggering_actor"             ": ${TRIGGERING_ACTOR}"
+          printf "%-45s %s\n" "github.event.pull_request.user.login" ": ${PR_USER_LOGIN:-<empty>}"
+          echo ""
+          echo "--------------------------------------------"
+          echo " Event: ${EVENT_NAME}"
+          echo "--------------------------------------------"
+          echo ""
+          echo "============================================"
+          echo " Comparison"
+          echo "============================================"
+
+          # actor vs triggering_actor
+          # 通常は同じだが、別ユーザーがワークフローを再実行した場合に異なる
+          if [ "${ACTOR}" = "${TRIGGERING_ACTOR}" ]; then
+            echo "[SAME] github.actor == github.triggering_actor"
+            echo "       => 同じユーザーがトリガーしており、再実行もされていないか同一ユーザーによる再実行"
+          else
+            echo "[DIFF] github.actor != github.triggering_actor"
+            echo "       => '${ACTOR}' がトリガーしたが '${TRIGGERING_ACTOR}' が再実行した"
+          fi
+
+          echo ""
+
+          # actor vs pull_request.user.login
+          # pull_request イベント以外では pull_request.user.login は空になる
+          # 別ユーザーがpushして同期した場合は actor と一致しないことがある
+          if [ -z "${PR_USER_LOGIN}" ]; then
+            echo "[N/A]  github.event.pull_request.user.login は空"
+            echo "       => pull_request イベント以外では存在しない (現在のイベント: ${EVENT_NAME})"
+          elif [ "${ACTOR}" = "${PR_USER_LOGIN}" ]; then
+            echo "[SAME] github.actor == github.event.pull_request.user.login"
+            echo "       => PRを作成したユーザーがワークフローをトリガーした"
+          else
+            echo "[DIFF] github.actor != github.event.pull_request.user.login"
+            echo "       => PR作成者: '${PR_USER_LOGIN}' / ワークフロートリガー: '${ACTOR}'"
+            echo "       => 別ユーザーのpushによるsynchronizeイベントなどで発生する"
+          fi
