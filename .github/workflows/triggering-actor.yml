@@ -44,7 +44,7 @@ jobs:
             echo "       => '${ACTOR}' がトリガーしたが '${TRIGGERING_ACTOR}' が再実行した"
           fi
 
-          echo ""
+          echo " "
 
           # actor vs pull_request.user.login
           # pull_request イベント以外では pull_request.user.login は空になる
